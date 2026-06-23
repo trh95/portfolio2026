@@ -1,0 +1,6 @@
+{
+  "name": "Tamás Horváth Portfolio",
+  "description": "Interactive developer portfolio featuring a continuous, scroll-driven desert fuse and explosion animation built with React and GSAP ScrollTrigger.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
