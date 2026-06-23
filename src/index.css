@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Crete+Round:ital@0;1&family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Crete Round", Georgia, serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Custom palette matching the desert/mine screenshots */
+  --color-desert-sky-start: #6ac5da;
+  --color-desert-sky-end: #bce9ea;
+  --color-desert-sand: #e4943f;
+  --color-desert-sand-dark: #a25c35;
+  --color-desert-clay: #894b28;
+  --color-desert-shadow: #733c1d;
+  --color-cactus-green: #5ca732;
+  --color-cactus-dark: #468421;
+}
+
+/* Custom scrollbar to keep it looking clean */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #a25c35;
+}
+::-webkit-scrollbar-thumb {
+  background: #733c1d;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #5c3016;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+  background-color: var(--color-desert-sand);
+  font-family: var(--font-sans);
+}
+
+/* Base custom styles */
+.serif-heading {
+  font-family: var(--font-serif);
+}
+
+/* Spark particle effects */
+@keyframes spark {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: drop-shadow(0 0 4px #ffe600);
+  }
+  100% {
+    transform: scale(0.3);
+    opacity: 0;
+    filter: drop-shadow(0 0 1px #ff3c00);
+  }
+}
+
+.spark-particle {
+  animation: spark 0.4s ease-out forwards;
+}
