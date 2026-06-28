@@ -4,6 +4,11 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
 
+const isIOS = typeof window !== 'undefined' && (
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+);
+
 interface HeroDetonatorProps {
   exploded: boolean;
 }
@@ -339,7 +344,7 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
         </div>
 
         {/* Central Detonator Unit */}
-        <div className="relative mx-auto mb-1 flex flex-col items-center z-30">
+        <div className="relative mx-auto mb-1 flex flex-col items-center z-20">
           {/* SVG representation of detonator box and movable plunger */}
           <div className="w-24 md:w-32 h-36 md:h-44 relative">
             <svg 
@@ -358,7 +363,7 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
                 <circle cx="60" cy="14" r="5" fill="#1e293b" />
 
                 {/* Highly detailed Majestic Vulture designed to fly onto T-bar handle and sink it down */}
-                <g ref={vultureRef}>
+                <g ref={vultureRef} style={isIOS ? { zIndex: 100 } : undefined}>
                   <g transform="translate(60, 8)">
                     
                     {/* Left Wing jointed at anchor -14, -28 */}
