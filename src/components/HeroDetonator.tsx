@@ -111,8 +111,8 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
           scrollTrigger: {
             trigger: containerRef.current,
             start: 'top top',
-            end: '12% top',
-            scrub: 0.3,
+            end: '50% top',
+            scrub: 0.8,
           }
         });
 
@@ -153,9 +153,9 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
           ease: 'power1.out',
           scrollTrigger: {
             trigger: containerRef.current,
-            start: '10% top', // kicks in as the vulture lands and stays pinned
-            end: '30% top',
-            scrub: 0.5,
+            start: '45% top', // kicks in as the vulture lands and stays pinned
+            end: '75% top',
+            scrub: 0.8,
           }
         });
       }
