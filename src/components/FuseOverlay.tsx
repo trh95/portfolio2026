@@ -33,6 +33,7 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
   }, []);
 
   useEffect(() => {
+    const wasExploded = explodedRef.current;
     explodedRef.current = exploded;
     if (exploded) {
       if (sparkRef.current) {
@@ -44,9 +45,13 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
         progPath.style.strokeDashoffset = '0';
       }
     } else {
-      // Re-armed: Keep readyToExplodeRef false until the user scrolls back up (progress < 0.95)
-      // to completely prevent the reset-scroll re-explosion race condition
-      readyToExplodeRef.current = false;
+      // Re-armed: Keep readyToExplodeRef false ONLY when resetting an active explosion (wasExploded is true)
+      // until the user scrolls back up (progress < 0.95) to completely prevent the reset-scroll re-explosion race condition
+      if (wasExploded) {
+        readyToExplodeRef.current = false;
+      } else {
+        readyToExplodeRef.current = true;
+      }
       
       const st = scrollTriggerRef.current;
       if (st) {
