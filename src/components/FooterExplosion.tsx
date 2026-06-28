@@ -87,7 +87,7 @@ export default function FooterExplosion({ exploded, setExploded }: FooterExplosi
 
     // Smoothly scroll up slightly so there's distance to re-scroll and detonate again
     window.scrollTo({
-      top: window.scrollY - 200,
+      top: window.scrollY - 300,
       behavior: 'smooth'
     });
     
