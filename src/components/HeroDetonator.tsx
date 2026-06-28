@@ -110,24 +110,39 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
         const startX = window.innerWidth * 0.7;
         const startY = -window.innerHeight - 150; // Guaranteed off-screen on all devices
 
-        // Continuous high-quality time-based wing flap animation
-        const wingFlapTl = gsap.timeline({ repeat: -1 });
-        wingFlapTl.to(leftWingRef.current, {
-          rotation: 30,
-          transformOrigin: '0% 0%',
-          duration: 0.14,
-          yoyo: true,
-          repeat: -1,
-          ease: 'sine.inOut'
-        }, 0);
-        wingFlapTl.to(rightWingRef.current, {
-          rotation: -30,
-          transformOrigin: '0% 0%',
-          duration: 0.14,
-          yoyo: true,
-          repeat: -1,
-          ease: 'sine.inOut'
-        }, 0);
+        // Continuous high-quality time-based wing flap animation managed dynamically
+        let wingFlapTl: gsap.core.Timeline | null = null;
+
+        const startFlapping = () => {
+          if (wingFlapTl) return; // Already flapping
+          wingFlapTl = gsap.timeline({ repeat: -1 });
+          wingFlapTl.to(leftWingRef.current, {
+            rotation: 30,
+            transformOrigin: '0% 0%',
+            duration: 0.14,
+            yoyo: true,
+            repeat: -1,
+            ease: 'sine.inOut'
+          }, 0);
+          wingFlapTl.to(rightWingRef.current, {
+            rotation: -30,
+            transformOrigin: '0% 0%',
+            duration: 0.14,
+            yoyo: true,
+            repeat: -1,
+            ease: 'sine.inOut'
+          }, 0);
+        };
+
+        const stopFlapping = () => {
+          if (wingFlapTl) {
+            wingFlapTl.kill();
+            wingFlapTl = null;
+          }
+          // Smoothly fold wings into resting state
+          gsap.to(leftWingRef.current, { rotation: 0, duration: 0.15, overwrite: 'auto', transformOrigin: '0% 0%' });
+          gsap.to(rightWingRef.current, { rotation: 0, duration: 0.15, overwrite: 'auto', transformOrigin: '0% 0%' });
+        };
 
         const vultureTl = gsap.timeline({
           scrollTrigger: {
@@ -139,14 +154,10 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
               const p = self.progress;
               if (p < 0.96) {
                 // Flying / swooping: resume natural flapping
-                if (!wingFlapTl.isActive()) {
-                  wingFlapTl.play();
-                }
+                startFlapping();
               } else {
                 // Landed: pause flapping and smoothly fold wings into resting state
-                wingFlapTl.pause();
-                gsap.to(leftWingRef.current, { rotation: 0, duration: 0.15, overwrite: 'auto', transformOrigin: '0% 0%' });
-                gsap.to(rightWingRef.current, { rotation: 0, duration: 0.15, overwrite: 'auto', transformOrigin: '0% 0%' });
+                stopFlapping();
               }
             }
           }
