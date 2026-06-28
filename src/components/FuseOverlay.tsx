@@ -45,8 +45,16 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
       }
     } else {
       // Re-armed! Do not set readyToExplodeRef.current = true immediately 
-      // because we are still at the very bottom of the page.
-      readyToExplodeRef.current = false;
+      // if we are still at the very bottom of the page.
+      const currentScroll = window.scrollY || window.pageYOffset;
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      const isAtBottom = maxScroll - currentScroll <= 120;
+      
+      if (isAtBottom) {
+        readyToExplodeRef.current = false;
+      } else {
+        readyToExplodeRef.current = true;
+      }
       const st = scrollTriggerRef.current;
       if (st) {
         st.update();
@@ -130,12 +138,19 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
     window.addEventListener('load', calculatePath);
 
     // Watch for internal height adjustments (e.g. text folds or image loads)
-    const observer = new ResizeObserver(() => calculatePath());
+    let frameId: number;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => {
+        calculatePath();
+      });
+    });
     observer.observe(document.body);
 
     return () => {
       window.removeEventListener('resize', calculatePath);
       window.removeEventListener('load', calculatePath);
+      cancelAnimationFrame(frameId);
       observer.disconnect();
     };
   }, []);
@@ -182,16 +197,19 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
           const progress = self.progress;
 
           // Trigger explosion when we hit the bottom
-          if (progress >= 0.995 && readyToExplodeRef.current) {
+          const currentScroll = window.scrollY || window.pageYOffset;
+          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+          const isAtBottom = maxScroll - currentScroll <= 40; // Extremely safe threshold on mobile Safari
+
+          if ((progress >= 0.98 || isAtBottom) && readyToExplodeRef.current) {
             readyToExplodeRef.current = false;
             setExploded(true);
             return;
           }
 
-          // Re-arm when scrolled back up (either below 0.98 progress or scrolled up by at least 60px)
-          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-          const scrolledUp = window.scrollY < maxScroll - 60;
-          if ((progress < 0.98 || scrolledUp) && !readyToExplodeRef.current) {
+          // Re-arm when scrolled back up (safely out of the bottom Zone)
+          const isWellAboveBottom = maxScroll - currentScroll > 120;
+          if (isWellAboveBottom && progress < 0.95 && !readyToExplodeRef.current) {
             readyToExplodeRef.current = true;
           }
 
