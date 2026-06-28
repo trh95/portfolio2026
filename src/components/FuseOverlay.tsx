@@ -5,22 +5,32 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 
 interface FuseOverlayProps {
-  onProgressUpdate: (progress: number) => void;
+  setExploded: (exploded: boolean) => void;
   exploded: boolean;
 }
 
-export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayProps) {
+export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const backgroundPathRef = useRef<SVGPathElement>(null);
   const progressPathRef = useRef<SVGPathElement>(null);
   const sparkRef = useRef<HTMLDivElement>(null);
+  const particlesContainerRef = useRef<HTMLDivElement>(null);
 
   const [pathData, setPathData] = useState('');
-  const [particles, setParticles] = useState<{ id: number; x: number; y: number }[]>([]);
-  const particleCounter = useRef(0);
+  const [isTouch, setIsTouch] = useState(false);
 
   const scrollTriggerRef = useRef<ScrollTrigger | null>(null);
   const explodedRef = useRef(exploded);
+  const readyToExplodeRef = useRef(true);
+
+  // Cache of pre-calculated path coordinates to avoid calling getPointAtLength on every scroll tick
+  const pointsRef = useRef<{ x: number; y: number }[]>([]);
+  const numSamples = 300; // 300 points is more than enough for high fidelity lookup
+
+  // Detect touch devices to bypass heavy SVG filters and throttle particle rates
+  useEffect(() => {
+    setIsTouch('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  }, []);
 
   useEffect(() => {
     explodedRef.current = exploded;
@@ -33,14 +43,14 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       if (progPath) {
         progPath.style.strokeDashoffset = '0';
       }
-      onProgressUpdate(1.0);
     } else {
-      // Re-armed! 
+      // Re-armed! Do not set readyToExplodeRef.current = true immediately 
+      // because we are still at the very bottom of the page.
+      readyToExplodeRef.current = false;
       const st = scrollTriggerRef.current;
       if (st) {
         st.update();
         const progress = st.progress;
-        onProgressUpdate(progress);
         
         const progPath = progressPathRef.current;
         if (progPath) {
@@ -50,11 +60,10 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
 
           if (progress > 0.005 && progress <= 1.0) {
             try {
-              const pointLength = progress * totalLength;
-              const point = progPath.getPointAtLength(pointLength);
-              if (sparkRef.current) {
-                sparkRef.current.style.left = `${point.x}px`;
-                sparkRef.current.style.top = `${point.y}px`;
+              const idx = Math.min(numSamples, Math.max(0, Math.round(progress * numSamples)));
+              const point = pointsRef.current[idx];
+              if (point && sparkRef.current) {
+                sparkRef.current.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%)`;
                 sparkRef.current.style.opacity = '1';
                 sparkRef.current.style.visibility = 'visible';
               }
@@ -68,8 +77,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
         }
       }
     }
-  }, [exploded, onProgressUpdate]);
-
+  }, [exploded]);
 
   useEffect(() => {
     const calculatePath = () => {
@@ -99,7 +107,6 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       const py3 = p3 ? p3 : { x: p4.x + 80, y: (p0.y + p4.y) * 0.8 };
 
       // Build smooth snake-like curved cubic-bezier route (M -> C or multiple Cs)
-      // Simulates a heavy rope or cable laid naturally on the ground using vertical-gravity S-curves.
       const h1 = py1.y - p0.y;
       const h2 = py2.y - py1.y;
       const h3 = py3.y - py2.y;
@@ -145,6 +152,19 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
     progPath.style.strokeDasharray = String(totalLength);
     progPath.style.strokeDashoffset = String(totalLength);
 
+    // Pre-calculate path points for O(1) rendering during scroll triggering
+    try {
+      const pts: { x: number; y: number }[] = [];
+      for (let i = 0; i <= numSamples; i++) {
+        const len = (i / numSamples) * totalLength;
+        const pt = progPath.getPointAtLength(len);
+        pts.push({ x: pt.x, y: pt.y });
+      }
+      pointsRef.current = pts;
+    } catch (e) {
+      console.warn('Could not pre-calculate path coordinates:', e);
+    }
+
     const ctx = gsap.context(() => {
       scrollTriggerRef.current = ScrollTrigger.create({
         trigger: 'body',
@@ -160,28 +180,40 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
             return;
           }
           const progress = self.progress;
-          onProgressUpdate(progress);
+
+          // Trigger explosion when we hit the bottom
+          if (progress >= 0.995 && readyToExplodeRef.current) {
+            readyToExplodeRef.current = false;
+            setExploded(true);
+            return;
+          }
+
+          // Re-arm when scrolled back up (either below 0.98 progress or scrolled up by at least 60px)
+          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+          const scrolledUp = window.scrollY < maxScroll - 60;
+          if ((progress < 0.98 || scrolledUp) && !readyToExplodeRef.current) {
+            readyToExplodeRef.current = true;
+          }
 
           // Update current strokeDashoffset instantly without any CSS delay
           const currentOffset = totalLength * (1 - progress);
           progPath.style.strokeDashoffset = String(currentOffset);
 
-          // Extract correct coordinate pairs along route for the sizzle spark
+          // Extract correct coordinate pairs along route from cached array
           if (progress > 0.005 && progress <= 1.0) {
-            const pointLength = progress * totalLength;
             try {
-              const point = progPath.getPointAtLength(pointLength);
+              const idx = Math.min(numSamples, Math.max(0, Math.round(progress * numSamples)));
+              const point = pointsRef.current[idx];
               
-              // Position the spark absolutely instantly in the exact same render ticket
-              if (sparkRef.current) {
-                sparkRef.current.style.left = `${point.x}px`;
-                sparkRef.current.style.top = `${point.y}px`;
+              // Position the spark using hardware-accelerated translate3d
+              if (point && sparkRef.current) {
+                sparkRef.current.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%)`;
                 sparkRef.current.style.opacity = '1';
                 sparkRef.current.style.visibility = 'visible';
-              }
 
-              // Generate custom flying sparks relative to leading coordinate
-              spawnSparkParticle(point.x, point.y);
+                // Generate custom flying sparks relative to leading coordinate
+                spawnSparkParticle(point.x, point.y);
+              }
             } catch (err) {
               // Ignore occasional browser SVG drawing coordinates discrepancies
             }
@@ -199,20 +231,34 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       ctx.revert();
       scrollTriggerRef.current = null;
     };
-  }, [pathData, onProgressUpdate]);
+  }, [pathData, setExploded]);
 
-  // Spawns burning flame embers relative to coordinate
+  // Spawns burning flame embers relative to coordinate (direct DOM write for high performance)
   const spawnSparkParticle = (x: number, y: number) => {
-    // Throttle spark rate
-    if (Math.random() > 0.45) return;
+    // Throttle spark rate significantly to keep mobile CPU and GPUs cool
+    const threshold = isTouch ? 0.92 : 0.45;
+    if (Math.random() > threshold) return;
 
-    const id = particleCounter.current++;
-    const newSpark = { id, x, y };
-    setParticles((prev) => [...prev.slice(-30), newSpark]);
+    const container = particlesContainerRef.current;
+    if (!container) return;
+
+    const particle = document.createElement('div');
+    particle.className = 'absolute w-1.5 h-1.5 rounded-full bg-amber-400 border border-amber-600 spark-particle pointer-events-none z-20';
+    
+    const px = x + (Math.random() - 0.5) * 16;
+    const py = y + (Math.random() - 0.5) * 16;
+    
+    particle.style.left = '0';
+    particle.style.top = '0';
+    particle.style.transform = `translate3d(${px}px, ${py}px, 0) translate(-50%, -50%)`;
+
+    container.appendChild(particle);
 
     // Cleanup particle after animation finishes (400ms)
     setTimeout(() => {
-      setParticles((prev) => prev.filter((p) => p.id !== id));
+      if (particle.parentNode === container) {
+        container.removeChild(particle);
+      }
     }, 400);
   };
 
@@ -268,7 +314,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
               stroke="url(#fuse-glow)"
               strokeWidth="5.5"
               strokeLinecap="round"
-              filter="url(#glow-panel)"
+              filter={isTouch ? undefined : "url(#glow-panel)"}
             />
           </>
         )}
@@ -281,7 +327,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
         style={{
           left: 0,
           top: 0,
-          transform: 'translate(-50%, -50%)',
+          transform: 'translate3d(0, 0, 0) translate(-50%, -50%)',
           opacity: 0,
           visibility: 'hidden',
           transition: 'none'
@@ -297,16 +343,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       </div>
 
       {/* 4. Falling spark embers in DOM space */}
-      {particles.map((p) => (
-        <div 
-          key={p.id}
-          className="absolute w-1.5 h-1.5 rounded-full bg-amber-400 border border-amber-600 spark-particle"
-          style={{
-            left: `${p.x + (Math.random() - 0.5) * 16}px`,
-            top: `${p.y + (Math.random() - 0.5) * 16}px`,
-          }}
-        />
-      ))}
+      <div ref={particlesContainerRef} className="absolute inset-0 pointer-events-none overflow-visible" />
     </div>
   );
 }
