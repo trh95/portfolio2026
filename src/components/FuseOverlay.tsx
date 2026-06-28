@@ -44,7 +44,7 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
         progPath.style.strokeDashoffset = '0';
       }
     } else {
-      // Re-armed: Keep readyToExplodeRef false until the user scrolls back up (progress < 0.90)
+      // Re-armed: Keep readyToExplodeRef false until the user scrolls back up (progress < 0.95)
       // to completely prevent the reset-scroll re-explosion race condition
       readyToExplodeRef.current = false;
       
@@ -188,15 +188,21 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
           }
           const progress = self.progress;
 
+          const currentScroll = window.scrollY || window.pageYOffset;
+          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+          const isAtBottom = maxScroll - currentScroll <= 15; // Within 15px of physical bottom of page
+
           // Trigger explosion precisely when the spark reaches the TNT at the bottom of the page
-          if (progress >= 0.985 && readyToExplodeRef.current) {
+          if ((progress >= 0.99 || isAtBottom) && readyToExplodeRef.current) {
             readyToExplodeRef.current = false;
-            setExploded(true);
+            if (typeof setExploded === 'function') {
+              setExploded(true);
+            }
             return;
           }
 
-          // Re-arm when scrolled back up (safely out of the bottom Zone)
-          if (progress < 0.90 && !readyToExplodeRef.current) {
+          // Re-arm when scrolled back up (safely out of the bottom zone)
+          if (progress < 0.95 && !isAtBottom && !readyToExplodeRef.current) {
             readyToExplodeRef.current = true;
           }
 
