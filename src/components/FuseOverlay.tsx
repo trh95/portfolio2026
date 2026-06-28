@@ -9,7 +9,14 @@ interface FuseOverlayProps {
   exploded: boolean;
 }
 
-export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps) {
+export default function FuseOverlay(props: FuseOverlayProps) {
+  const { setExploded, exploded } = props;
+  const setExplodedRef = useRef(setExploded);
+
+  useEffect(() => {
+    setExplodedRef.current = setExploded;
+  }, [setExploded]);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const backgroundPathRef = useRef<SVGPathElement>(null);
   const progressPathRef = useRef<SVGPathElement>(null);
@@ -195,13 +202,13 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
 
           const currentScroll = window.scrollY || window.pageYOffset;
           const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-          const isAtBottom = maxScroll - currentScroll <= 15; // Within 15px of physical bottom of page
+          const isAtBottom = maxScroll - currentScroll <= 35; // Within 35px of physical bottom of page
 
           // Trigger explosion precisely when the spark reaches the TNT at the bottom of the page
           if ((progress >= 0.99 || isAtBottom) && readyToExplodeRef.current) {
             readyToExplodeRef.current = false;
-            if (typeof setExploded === 'function') {
-              setExploded(true);
+            if (typeof setExplodedRef.current === 'function') {
+              setExplodedRef.current(true);
             }
             return;
           }
