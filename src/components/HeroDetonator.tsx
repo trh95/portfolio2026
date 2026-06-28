@@ -344,7 +344,15 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
         </div>
 
         {/* Central Detonator Unit */}
-        <div className="relative mx-auto mb-1 flex flex-col items-center z-20">
+        <div 
+          className={`relative mx-auto mb-1 flex flex-col items-center ${isIOS ? 'z-[100]' : 'z-20'}`}
+          style={isIOS ? {
+            transform: 'translate3d(0, 0, 100px)',
+            WebkitTransform: 'translate3d(0, 0, 100px)',
+            transformStyle: 'preserve-3d',
+            WebkitTransformStyle: 'preserve-3d',
+          } : undefined}
+        >
           {/* SVG representation of detonator box and movable plunger */}
           <div className="w-24 md:w-32 h-36 md:h-44 relative">
             <svg 
@@ -363,7 +371,16 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
                 <circle cx="60" cy="14" r="5" fill="#1e293b" />
 
                 {/* Highly detailed Majestic Vulture designed to fly onto T-bar handle and sink it down */}
-                <g ref={vultureRef} style={isIOS ? { zIndex: 100 } : undefined}>
+                <g 
+                  ref={vultureRef} 
+                  style={isIOS ? { 
+                    zIndex: 100, 
+                    transform: 'translate3d(0, 0, 100px)', 
+                    WebkitTransform: 'translate3d(0, 0, 100px)',
+                    transformStyle: 'preserve-3d',
+                    WebkitTransformStyle: 'preserve-3d' 
+                  } : undefined}
+                >
                   <g transform="translate(60, 8)">
                     
                     {/* Left Wing jointed at anchor -14, -28 */}
