@@ -44,17 +44,9 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
         progPath.style.strokeDashoffset = '0';
       }
     } else {
-      // Re-armed! Do not set readyToExplodeRef.current = true immediately 
-      // if we are still at the very bottom of the page.
-      const currentScroll = window.scrollY || window.pageYOffset;
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-      const isAtBottom = maxScroll - currentScroll <= 120;
+      // Re-armed: Set readyToExplodeRef to true unconditionally to guarantee 100% reliable detonation
+      readyToExplodeRef.current = true;
       
-      if (isAtBottom) {
-        readyToExplodeRef.current = false;
-      } else {
-        readyToExplodeRef.current = true;
-      }
       const st = scrollTriggerRef.current;
       if (st) {
         st.update();
@@ -184,9 +176,8 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
       scrollTriggerRef.current = ScrollTrigger.create({
         trigger: 'body',
         start: () => {
-          const heroEl = document.getElementById('hero');
-          const startOffset = heroEl ? heroEl.offsetHeight * 0.3 : window.innerHeight * 0.3;
-          return `top+=${startOffset} top`;
+          // Perfectly timed to ignite the spark precisely as the plunger is pushed to the bottom in HeroDetonator (at 580px of scroll)
+          return 'top+=580 top';
         },
         end: 'bottom-=85 bottom', // Ends 85px before physical bottom to guarantee reaching 100% progress on mobile/Safari
         onUpdate: (self) => {
