@@ -12,7 +12,6 @@ import FooterExplosion from './components/FooterExplosion';
 import FuseOverlay from './components/FuseOverlay';
 
 export default function App() {
-  const [fuseProgress, setFuseProgress] = useState(0);
   const [activeSection, setActiveSection] = useState('hero');
   const [exploded, setExploded] = useState(false);
 
@@ -77,14 +76,13 @@ export default function App() {
 
         {/* Mine Entrance Cave & Explosive Reveal Segment */}
         <FooterExplosion 
-          fuseProgress={fuseProgress} 
           exploded={exploded} 
           setExploded={setExploded} 
         />
       </main>
 
       {/* 3. Global SVG Custom Dynamic Fuse Overlapping Spline */}
-      <FuseOverlay onProgressUpdate={setFuseProgress} exploded={exploded} />
+      <FuseOverlay setExploded={setExploded} exploded={exploded} />
 
     </div>
   );

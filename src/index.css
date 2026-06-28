@@ -40,6 +40,10 @@ html, body {
   overflow-x: hidden;
   background-color: var(--color-desert-sand);
   font-family: var(--font-sans);
+  scroll-behavior: auto;
+  -webkit-overflow-scrolling: touch;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Base custom styles */

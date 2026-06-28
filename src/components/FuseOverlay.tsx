@@ -5,24 +5,42 @@ import { ScrollTrigger } from 'gsap/ScrollTrigger';
 gsap.registerPlugin(ScrollTrigger);
 
 interface FuseOverlayProps {
-  onProgressUpdate: (progress: number) => void;
+  setExploded: (exploded: boolean) => void;
   exploded: boolean;
 }
 
-export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayProps) {
+export default function FuseOverlay(props: FuseOverlayProps) {
+  const { setExploded, exploded } = props;
+  const setExplodedRef = useRef(setExploded);
+
+  useEffect(() => {
+    setExplodedRef.current = setExploded;
+  }, [setExploded]);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const backgroundPathRef = useRef<SVGPathElement>(null);
   const progressPathRef = useRef<SVGPathElement>(null);
   const sparkRef = useRef<HTMLDivElement>(null);
+  const particlesContainerRef = useRef<HTMLDivElement>(null);
 
   const [pathData, setPathData] = useState('');
-  const [particles, setParticles] = useState<{ id: number; x: number; y: number }[]>([]);
-  const particleCounter = useRef(0);
+  const [isTouch, setIsTouch] = useState(false);
 
   const scrollTriggerRef = useRef<ScrollTrigger | null>(null);
   const explodedRef = useRef(exploded);
+  const readyToExplodeRef = useRef(true);
+
+  // Cache of pre-calculated path coordinates to avoid calling getPointAtLength on every scroll tick
+  const pointsRef = useRef<{ x: number; y: number }[]>([]);
+  const numSamples = 300; // 300 points is more than enough for high fidelity lookup
+
+  // Detect touch devices to bypass heavy SVG filters and throttle particle rates
+  useEffect(() => {
+    setIsTouch('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  }, []);
 
   useEffect(() => {
+    const wasExploded = explodedRef.current;
     explodedRef.current = exploded;
     if (exploded) {
       if (sparkRef.current) {
@@ -33,14 +51,19 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       if (progPath) {
         progPath.style.strokeDashoffset = '0';
       }
-      onProgressUpdate(1.0);
     } else {
-      // Re-armed! 
+      // Re-armed: Keep readyToExplodeRef false ONLY when resetting an active explosion (wasExploded is true)
+      // until the user scrolls back up (progress < 0.95) to completely prevent the reset-scroll re-explosion race condition
+      if (wasExploded) {
+        readyToExplodeRef.current = false;
+      } else {
+        readyToExplodeRef.current = true;
+      }
+      
       const st = scrollTriggerRef.current;
       if (st) {
         st.update();
         const progress = st.progress;
-        onProgressUpdate(progress);
         
         const progPath = progressPathRef.current;
         if (progPath) {
@@ -50,11 +73,10 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
 
           if (progress > 0.005 && progress <= 1.0) {
             try {
-              const pointLength = progress * totalLength;
-              const point = progPath.getPointAtLength(pointLength);
-              if (sparkRef.current) {
-                sparkRef.current.style.left = `${point.x}px`;
-                sparkRef.current.style.top = `${point.y}px`;
+              const idx = Math.min(numSamples, Math.max(0, Math.round(progress * numSamples)));
+              const point = pointsRef.current[idx];
+              if (point && sparkRef.current) {
+                sparkRef.current.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%)`;
                 sparkRef.current.style.opacity = '1';
                 sparkRef.current.style.visibility = 'visible';
               }
@@ -68,8 +90,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
         }
       }
     }
-  }, [exploded, onProgressUpdate]);
-
+  }, [exploded]);
 
   useEffect(() => {
     const calculatePath = () => {
@@ -80,8 +101,8 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
         const scrollY = window.scrollY;
         const scrollX = window.scrollX;
         return {
-          x: rect.left + rect.width / 2 + scrollX,
-          y: rect.top + rect.height / 2 + scrollY
+          x: Math.round(rect.left + rect.width / 2 + scrollX),
+          y: Math.round(rect.top + rect.height / 2 + scrollY)
         };
       };
 
@@ -99,7 +120,6 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       const py3 = p3 ? p3 : { x: p4.x + 80, y: (p0.y + p4.y) * 0.8 };
 
       // Build smooth snake-like curved cubic-bezier route (M -> C or multiple Cs)
-      // Simulates a heavy rope or cable laid naturally on the ground using vertical-gravity S-curves.
       const h1 = py1.y - p0.y;
       const h2 = py2.y - py1.y;
       const h3 = py3.y - py2.y;
@@ -122,14 +142,60 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
     window.addEventListener('resize', calculatePath);
     window.addEventListener('load', calculatePath);
 
-    // Watch for internal height adjustments (e.g. text folds or image loads)
-    const observer = new ResizeObserver(() => calculatePath());
+    // Watch for actual dimension updates only to completely bypass scroll-trigger feedback loop
+    let frameId: number;
+    let lastHeight = document.documentElement.scrollHeight;
+    let lastWidth = window.innerWidth;
+
+    const observer = new ResizeObserver(() => {
+      const currentHeight = document.documentElement.scrollHeight;
+      const currentWidth = window.innerWidth;
+      
+      if (currentHeight !== lastHeight || currentWidth !== lastWidth) {
+        lastHeight = currentHeight;
+        lastWidth = currentWidth;
+        cancelAnimationFrame(frameId);
+        frameId = requestAnimationFrame(() => {
+          calculatePath();
+        });
+      }
+    });
     observer.observe(document.body);
 
     return () => {
       window.removeEventListener('resize', calculatePath);
       window.removeEventListener('load', calculatePath);
+      cancelAnimationFrame(frameId);
       observer.disconnect();
+    };
+  }, []);
+
+  // Native high-reliability window scroll listener fallback for absolute physical bottom detection
+  useEffect(() => {
+    const handleScroll = () => {
+      if (explodedRef.current) return;
+      const currentScroll = window.scrollY || window.pageYOffset;
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      
+      // Fully responsive boundary: 45px off the physical end of scroll represents a complete scroll down
+      const isAtBottom = maxScroll - currentScroll <= 45;
+
+      if (isAtBottom && readyToExplodeRef.current) {
+        readyToExplodeRef.current = false;
+        if (typeof setExplodedRef.current === 'function') {
+          setExplodedRef.current(true);
+        }
+      } else if (!isAtBottom && !readyToExplodeRef.current) {
+        // Once scrolled back up past 100px from the bottom, safe to re-arm
+        if (maxScroll - currentScroll > 100) {
+          readyToExplodeRef.current = true;
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -145,43 +211,71 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
     progPath.style.strokeDasharray = String(totalLength);
     progPath.style.strokeDashoffset = String(totalLength);
 
+    // Pre-calculate path points for O(1) rendering during scroll triggering
+    try {
+      const pts: { x: number; y: number }[] = [];
+      for (let i = 0; i <= numSamples; i++) {
+        const len = (i / numSamples) * totalLength;
+        const pt = progPath.getPointAtLength(len);
+        pts.push({ x: pt.x, y: pt.y });
+      }
+      pointsRef.current = pts;
+    } catch (e) {
+      console.warn('Could not pre-calculate path coordinates:', e);
+    }
+
     const ctx = gsap.context(() => {
       scrollTriggerRef.current = ScrollTrigger.create({
         trigger: 'body',
         start: () => {
-          const heroEl = document.getElementById('hero');
-          const startOffset = heroEl ? heroEl.offsetHeight * 0.3 : window.innerHeight * 0.3;
-          return `top+=${startOffset} top`;
+          // Perfectly timed to ignite the spark precisely as the plunger is pushed to the bottom in HeroDetonator (at 580px of scroll)
+          return 'top+=580 top';
         },
-        end: 'bottom bottom',
+        end: 'bottom bottom', // Ends exactly at the physical bottom of the page
         onUpdate: (self) => {
           if (explodedRef.current) {
             // Once exploded, do not track scroll modifications back or forth!
             return;
           }
           const progress = self.progress;
-          onProgressUpdate(progress);
+
+          const currentScroll = window.scrollY || window.pageYOffset;
+          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+          const isAtBottom = maxScroll - currentScroll <= 45; // Within 45px of physical bottom of page
+
+          // Trigger explosion precisely when the spark reaches the TNT at the bottom of the page (with a safe 0.98 threshold)
+          if ((progress >= 0.98 || isAtBottom) && readyToExplodeRef.current) {
+            readyToExplodeRef.current = false;
+            if (typeof setExplodedRef.current === 'function') {
+              setExplodedRef.current(true);
+            }
+            return;
+          }
+
+          // Re-arm when scrolled back up (safely out of the bottom zone)
+          if (progress < 0.95 && !isAtBottom && !readyToExplodeRef.current) {
+            readyToExplodeRef.current = true;
+          }
 
           // Update current strokeDashoffset instantly without any CSS delay
           const currentOffset = totalLength * (1 - progress);
           progPath.style.strokeDashoffset = String(currentOffset);
 
-          // Extract correct coordinate pairs along route for the sizzle spark
+          // Extract correct coordinate pairs along route from cached array
           if (progress > 0.005 && progress <= 1.0) {
-            const pointLength = progress * totalLength;
             try {
-              const point = progPath.getPointAtLength(pointLength);
+              const idx = Math.min(numSamples, Math.max(0, Math.round(progress * numSamples)));
+              const point = pointsRef.current[idx];
               
-              // Position the spark absolutely instantly in the exact same render ticket
-              if (sparkRef.current) {
-                sparkRef.current.style.left = `${point.x}px`;
-                sparkRef.current.style.top = `${point.y}px`;
+              // Position the spark using hardware-accelerated translate3d
+              if (point && sparkRef.current) {
+                sparkRef.current.style.transform = `translate3d(${point.x}px, ${point.y}px, 0) translate(-50%, -50%)`;
                 sparkRef.current.style.opacity = '1';
                 sparkRef.current.style.visibility = 'visible';
-              }
 
-              // Generate custom flying sparks relative to leading coordinate
-              spawnSparkParticle(point.x, point.y);
+                // Generate custom flying sparks relative to leading coordinate
+                spawnSparkParticle(point.x, point.y);
+              }
             } catch (err) {
               // Ignore occasional browser SVG drawing coordinates discrepancies
             }
@@ -199,20 +293,34 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       ctx.revert();
       scrollTriggerRef.current = null;
     };
-  }, [pathData, onProgressUpdate]);
+  }, [pathData, setExploded]);
 
-  // Spawns burning flame embers relative to coordinate
+  // Spawns burning flame embers relative to coordinate (direct DOM write for high performance)
   const spawnSparkParticle = (x: number, y: number) => {
-    // Throttle spark rate
-    if (Math.random() > 0.45) return;
+    // Throttle spark rate significantly to keep mobile CPU and GPUs cool
+    const threshold = isTouch ? 0.92 : 0.45;
+    if (Math.random() > threshold) return;
 
-    const id = particleCounter.current++;
-    const newSpark = { id, x, y };
-    setParticles((prev) => [...prev.slice(-30), newSpark]);
+    const container = particlesContainerRef.current;
+    if (!container) return;
+
+    const particle = document.createElement('div');
+    particle.className = 'absolute w-1.5 h-1.5 rounded-full bg-amber-400 border border-amber-600 spark-particle pointer-events-none z-20';
+    
+    const px = x + (Math.random() - 0.5) * 16;
+    const py = y + (Math.random() - 0.5) * 16;
+    
+    particle.style.left = '0';
+    particle.style.top = '0';
+    particle.style.transform = `translate3d(${px}px, ${py}px, 0) translate(-50%, -50%)`;
+
+    container.appendChild(particle);
 
     // Cleanup particle after animation finishes (400ms)
     setTimeout(() => {
-      setParticles((prev) => prev.filter((p) => p.id !== id));
+      if (particle.parentNode === container) {
+        container.removeChild(particle);
+      }
     }, 400);
   };
 
@@ -268,7 +376,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
               stroke="url(#fuse-glow)"
               strokeWidth="5.5"
               strokeLinecap="round"
-              filter="url(#glow-panel)"
+              filter={isTouch ? undefined : "url(#glow-panel)"}
             />
           </>
         )}
@@ -281,7 +389,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
         style={{
           left: 0,
           top: 0,
-          transform: 'translate(-50%, -50%)',
+          transform: 'translate3d(0, 0, 0) translate(-50%, -50%)',
           opacity: 0,
           visibility: 'hidden',
           transition: 'none'
@@ -297,16 +405,7 @@ export default function FuseOverlay({ onProgressUpdate, exploded }: FuseOverlayP
       </div>
 
       {/* 4. Falling spark embers in DOM space */}
-      {particles.map((p) => (
-        <div 
-          key={p.id}
-          className="absolute w-1.5 h-1.5 rounded-full bg-amber-400 border border-amber-600 spark-particle"
-          style={{
-            left: `${p.x + (Math.random() - 0.5) * 16}px`,
-            top: `${p.y + (Math.random() - 0.5) * 16}px`,
-          }}
-        />
-      ))}
+      <div ref={particlesContainerRef} className="absolute inset-0 pointer-events-none overflow-visible" />
     </div>
   );
 }

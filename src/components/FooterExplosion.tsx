@@ -7,12 +7,11 @@ import DetonatorLogo from './DetonatorLogo';
 gsap.registerPlugin(ScrollTrigger);
 
 interface FooterExplosionProps {
-  fuseProgress: number; // 0 to 1 from parent scrolled wire
   exploded: boolean;
   setExploded: (exploded: boolean) => void;
 }
 
-export default function FooterExplosion({ fuseProgress, exploded, setExploded }: FooterExplosionProps) {
+export default function FooterExplosion({ exploded, setExploded }: FooterExplosionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const explosionRef = useRef<HTMLDivElement>(null);
   const staticMineRef = useRef<HTMLDivElement>(null);
@@ -20,19 +19,13 @@ export default function FooterExplosion({ fuseProgress, exploded, setExploded }:
   
   const [particles, setParticles] = useState<{ id: number; dx: number; dy: number; size: number }[]>([]);
   const [copied, setCopied] = useState(false);
-  const [readyToExplode, setReadyToExplode] = useState(true);
 
-  // Trigger explosion details when fuse reaches the absolute bottom
+  // Trigger explosion details when exploded is true
   useEffect(() => {
-    // If progress is near 100%, not exploded, and armed/ready
-    if (fuseProgress >= 0.995 && !exploded && readyToExplode) {
+    if (exploded) {
       triggerExplosion();
     }
-    // Prime the explosion again once the user has scrolled up slightly away from the bottom (past 98% mark)
-    if (fuseProgress < 0.98 && !readyToExplode) {
-      setReadyToExplode(true);
-    }
-  }, [fuseProgress, exploded, readyToExplode]);
+  }, [exploded]);
 
   const triggerExplosion = () => {
     setExploded(true);
@@ -86,7 +79,6 @@ export default function FooterExplosion({ fuseProgress, exploded, setExploded }:
   };
 
   const resetExplosion = () => {
-    setReadyToExplode(false);
     setExploded(false);
     setParticles([]);
     
@@ -95,7 +87,7 @@ export default function FooterExplosion({ fuseProgress, exploded, setExploded }:
 
     // Smoothly scroll up slightly so there's distance to re-scroll and detonate again
     window.scrollTo({
-      top: window.scrollY - 200,
+      top: window.scrollY - 300,
       behavior: 'smooth'
     });
     
@@ -275,10 +267,10 @@ export default function FooterExplosion({ fuseProgress, exploded, setExploded }:
         {/* State B: Active Explosion Blast & Social Portal Reveal */}
         <div 
           ref={explosionRef}
-          className={`absolute w-full max-w-[540px] aspect-square flex items-center justify-center ${
+          className={`absolute w-[130vw] min-w-[500px] sm:w-full sm:min-w-0 max-w-[540px] md:max-w-[600px] aspect-square flex items-center justify-center ${
             exploded ? 'pointer-events-auto visible' : 'pointer-events-none invisible'
           }`}
-          style={{ transform: 'scale(0)' }}
+          style={exploded ? undefined : { transform: 'scale(0)', opacity: 0 }}
         >
           {/* Jagged Explosion Vector Vector matching screenshots */}
           <svg 
@@ -333,7 +325,7 @@ export default function FooterExplosion({ fuseProgress, exploded, setExploded }:
                 <a 
                   href="mailto:tamasrhorvath@gmail.com"
                   aria-label="Contact Email"
-                 className="w-14 h-14 bg-[#1c1917] hover:bg-[#292524] text-[#facc15] hover:text-[#facc15] rounded-full border-2 border-stone-900 flex items-center justify-center transition-all duration-300 transform hover:scale-110 shadow-lg shadow-black/25"
+                  className="w-14 h-14 bg-[#1c1917] hover:bg-[#292524] text-[#facc15] hover:text-[#facc15] rounded-full border-2 border-stone-900 flex items-center justify-center transition-all duration-300 transform hover:scale-110 shadow-lg shadow-black/25"
                 >
                   
                   <Mail className="w-6 h-6" />
@@ -361,14 +353,15 @@ export default function FooterExplosion({ fuseProgress, exploded, setExploded }:
                   <Linkedin className="w-6 h-6" />
                 </a>
               </div>
+
+              {/* Reset loop flow callback button placed with healthy space in the flow */}
+              <button 
+                onClick={resetExplosion}
+                className="mt-8 px-5 py-2 bg-stone-950 hover:bg-[#b91c1c] text-slate-300 hover:text-white rounded-full text-[10px] font-mono tracking-widest uppercase flex items-center gap-1.5 transition-all shadow-md z-20 hover:scale-105 active:scale-95"
+              >
+                <RefreshCw className="w-3 h-3" /> Re-arm TNT
+              </button>
             </div>
-          {/* Reset loop flow callback button absolutely positioned so it does not skew the central texts */}
-          <button 
-            onClick={resetExplosion}
-            className="absolute bottom-[30%] left-1/2 -translate-x-1/2 px-4 py-2 bg-stone-950/80 hover:bg-stone-950 text-slate-300 hover:text-white rounded-full text-[10px] font-mono tracking-widest uppercase flex items-center gap-1.5 transition-all shadow z-20 pointer-events-auto"
-          >
-            <RefreshCw className="w-3 h-3" /> Re-arm TNT
-          </button>
           </div>
 
         </div>

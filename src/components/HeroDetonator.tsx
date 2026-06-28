@@ -105,45 +105,76 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
         }, 6.0);
 
       } else {
-        // Normal scroll-animated behavior
-        // Vulture swoop-in and wing-flap landing sequence
+        // Normal scroll-animated behavior:
+        // Vulture starts completely off-screen, small, and invisible, then swoops in via a curved trajectory
+        const startX = window.innerWidth * 0.7;
+        const startY = -window.innerHeight - 150; // Guaranteed off-screen on all devices
+
+        // Continuous high-quality time-based wing flap animation
+        const wingFlapTl = gsap.timeline({ repeat: -1 });
+        wingFlapTl.to(leftWingRef.current, {
+          rotation: 30,
+          transformOrigin: '0% 0%',
+          duration: 0.14,
+          yoyo: true,
+          repeat: -1,
+          ease: 'sine.inOut'
+        }, 0);
+        wingFlapTl.to(rightWingRef.current, {
+          rotation: -30,
+          transformOrigin: '0% 0%',
+          duration: 0.14,
+          yoyo: true,
+          repeat: -1,
+          ease: 'sine.inOut'
+        }, 0);
+
         const vultureTl = gsap.timeline({
           scrollTrigger: {
             trigger: containerRef.current,
             start: 'top top',
-            end: '12% top',
-            scrub: 0.3,
+            end: 'top+=420 top',
+            scrub: 0.6, // Butter-smooth scrolling interpolation
+            onUpdate: (self) => {
+              const p = self.progress;
+              if (p < 0.96) {
+                // Flying / swooping: resume natural flapping
+                if (!wingFlapTl.isActive()) {
+                  wingFlapTl.play();
+                }
+              } else {
+                // Landed: pause flapping and smoothly fold wings into resting state
+                wingFlapTl.pause();
+                gsap.to(leftWingRef.current, { rotation: 0, duration: 0.15, overwrite: 'auto', transformOrigin: '0% 0%' });
+                gsap.to(rightWingRef.current, { rotation: 0, duration: 0.15, overwrite: 'auto', transformOrigin: '0% 0%' });
+              }
+            }
           }
         });
 
-        // Fly-in trajectory from the sky down to landing coordinate
+        // 1. Horizontal movement, scaling, rotation, and fading in (Power2 ease)
         vultureTl.fromTo(vultureRef.current, {
-          x: 450,
-          y: -420,
-          scale: 2.2,
-          rotation: -45,
+          x: startX,
+          scale: 0.3,
+          opacity: 0,
+          rotation: -40,
         }, {
           x: 0,
-          y: 0,
           scale: 1,
+          opacity: 1,
           rotation: 0,
           duration: 1.0,
-          ease: 'none',
+          ease: 'power2.out',
         }, 0);
 
-        // Left wing flapping keyframes (around its (0,0) local joint base)
-        vultureTl.fromTo(leftWingRef.current, { rotation: -40 }, { rotation: 25, duration: 0.2 }, 0)
-                 .to(leftWingRef.current, { rotation: -30, duration: 0.2 })
-                 .to(leftWingRef.current, { rotation: 25, duration: 0.2 })
-                 .to(leftWingRef.current, { rotation: -15, duration: 0.2 })
-                 .to(leftWingRef.current, { rotation: 0, duration: 0.2 });
-
-        // Right wing flapping keyframes (around its (0,0) local joint base)
-        vultureTl.fromTo(rightWingRef.current, { rotation: 40 }, { rotation: -25, duration: 0.2 }, 0)
-                 .to(rightWingRef.current, { rotation: 30, duration: 0.2 })
-                 .to(rightWingRef.current, { rotation: -25, duration: 0.2 })
-                 .to(rightWingRef.current, { rotation: 15, duration: 0.2 })
-                 .to(rightWingRef.current, { rotation: 0, duration: 0.2 });
+        // 2. Vertical movement animated with different ease to form a gorgeous organic curved swoop path!
+        vultureTl.fromTo(vultureRef.current, {
+          y: startY,
+        }, {
+          y: 0,
+          duration: 1.0,
+          ease: 'sine.out',
+        }, 0);
 
         // Animate the plunger down as the user scrolls, driven by the vulture's landing weight
         gsap.fromTo(handleRef.current, {
@@ -153,9 +184,9 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
           ease: 'power1.out',
           scrollTrigger: {
             trigger: containerRef.current,
-            start: '10% top', // kicks in as the vulture lands and stays pinned
-            end: '30% top',
-            scrub: 0.5,
+            start: 'top+=390 top', // starts precisely as the vulture settles on the plunger
+            end: 'top+=590 top',   // pushed down over 200px of scrolling
+            scrub: 0.6,
           }
         });
       }
