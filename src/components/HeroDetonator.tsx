@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
@@ -16,6 +16,17 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
   const leftWingRef = useRef<SVGGElement>(null);
   const rightWingRef = useRef<SVGGElement>(null);
   const headRef = useRef<SVGGElement>(null);
+
+  const [isIOS, setIsIOS] = useState(false);
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent || window.navigator.vendor || (window as any).opera;
+    const isIOSDevice = /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+    const isIPadPro = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+    if (isIOSDevice || isIPadPro) {
+      setIsIOS(true);
+    }
+  }, []);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -283,7 +294,7 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
       </div>
 
       {/* Desert Floor and Flanking Cacti */}
-      <div className="relative w-full h-[32%] flex flex-col justify-end bg-transparent">
+      <div className={`relative w-full h-[32%] flex flex-col justify-end bg-transparent ${isIOS ? 'z-30' : ''}`}>
         {/* Desert Floor Backdrop (becoming the sand layer base below the fuse) */}
         <div className="absolute inset-0 bg-[#e4943f] z-[1] select-none pointer-events-none">
           {/* Curved Sand Transition Line */}
