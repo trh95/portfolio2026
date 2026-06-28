@@ -288,7 +288,7 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
       </div>
 
       {/* Desert Floor and Flanking Cacti */}
-      <div className="relative w-full h-[32%] flex flex-col justify-end bg-transparent">
+      <div className={`relative w-full h-[32%] flex flex-col justify-end bg-transparent ${isIOS ? 'z-[30]' : ''}`}>
         {/* Desert Floor Backdrop (becoming the sand layer base below the fuse) */}
         <div className="absolute inset-0 bg-[#e4943f] z-[1] select-none pointer-events-none">
           {/* Curved Sand Transition Line */}
@@ -371,16 +371,7 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
                 <circle cx="60" cy="14" r="5" fill="#1e293b" />
 
                 {/* Highly detailed Majestic Vulture designed to fly onto T-bar handle and sink it down */}
-                <g 
-                  ref={vultureRef} 
-                  style={isIOS ? { 
-                    zIndex: 100, 
-                    transform: 'translate3d(0, 0, 100px)', 
-                    WebkitTransform: 'translate3d(0, 0, 100px)',
-                    transformStyle: 'preserve-3d',
-                    WebkitTransformStyle: 'preserve-3d' 
-                  } : undefined}
-                >
+                <g ref={vultureRef}>
                   <g transform="translate(60, 8)">
                     
                     {/* Left Wing jointed at anchor -14, -28 */}
