@@ -493,9 +493,15 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
               {/* Little outlet valve at bottom where fuse wire exits */}
               <rect x="53" y="160" width="14" height="8" fill="#475569" stroke="#1e293b" strokeWidth="2" />
               <circle cx="60" cy="164" r="3" fill="#1e293b" />
-              {/* Fuse Start Anchor Point (Precisely centered inside SVG viewBox) */}
-              <circle id="detonator-anchor" cx="60" cy="164" r="1.5" opacity="0" className="pointer-events-none" />
+              {/* Fallback hidden indicator inside SVG */}
+              <circle cx="60" cy="164" r="1.5" opacity="0" className="pointer-events-none" />
             </svg>
+            {/* Standard HTML absolute anchor point to bypass iOS/Safari nested SVG getBoundingClientRect() coordinate bugs */}
+            <div 
+              id="detonator-anchor" 
+              className="absolute pointer-events-none w-1 h-1"
+              style={{ left: '50%', top: '91.11%', transform: 'translate(-50%, -50%)' }}
+            />
           </div>
         </div>
       </div>
