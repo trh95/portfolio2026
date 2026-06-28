@@ -44,8 +44,9 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
         progPath.style.strokeDashoffset = '0';
       }
     } else {
-      // Re-armed: Set readyToExplodeRef to true unconditionally to guarantee 100% reliable detonation
-      readyToExplodeRef.current = true;
+      // Re-armed: Keep readyToExplodeRef false until the user scrolls back up (progress < 0.90)
+      // to completely prevent the reset-scroll re-explosion race condition
+      readyToExplodeRef.current = false;
       
       const st = scrollTriggerRef.current;
       if (st) {
@@ -179,7 +180,7 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
           // Perfectly timed to ignite the spark precisely as the plunger is pushed to the bottom in HeroDetonator (at 580px of scroll)
           return 'top+=580 top';
         },
-        end: 'bottom-=85 bottom', // Ends 85px before physical bottom to guarantee reaching 100% progress on mobile/Safari
+        end: 'bottom bottom', // Ends exactly at the physical bottom of the page
         onUpdate: (self) => {
           if (explodedRef.current) {
             // Once exploded, do not track scroll modifications back or forth!
@@ -187,20 +188,15 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
           }
           const progress = self.progress;
 
-          // Trigger explosion when we hit the bottom area
-          const currentScroll = window.scrollY || window.pageYOffset;
-          const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-          const isAtBottom = maxScroll - currentScroll <= 90; // Extremely safe threshold on mobile Safari
-
-          if ((progress >= 0.98 || isAtBottom) && readyToExplodeRef.current) {
+          // Trigger explosion precisely when the spark reaches the TNT at the bottom of the page
+          if (progress >= 0.985 && readyToExplodeRef.current) {
             readyToExplodeRef.current = false;
             setExploded(true);
             return;
           }
 
           // Re-arm when scrolled back up (safely out of the bottom Zone)
-          const isWellAboveBottom = maxScroll - currentScroll > 120;
-          if (isWellAboveBottom && progress < 0.95 && !readyToExplodeRef.current) {
+          if (progress < 0.90 && !readyToExplodeRef.current) {
             readyToExplodeRef.current = true;
           }
 
