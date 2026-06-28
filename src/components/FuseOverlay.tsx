@@ -101,8 +101,8 @@ export default function FuseOverlay(props: FuseOverlayProps) {
         const scrollY = window.scrollY;
         const scrollX = window.scrollX;
         return {
-          x: rect.left + rect.width / 2 + scrollX,
-          y: rect.top + rect.height / 2 + scrollY
+          x: Math.round(rect.left + rect.width / 2 + scrollX),
+          y: Math.round(rect.top + rect.height / 2 + scrollY)
         };
       };
 
@@ -142,13 +142,23 @@ export default function FuseOverlay(props: FuseOverlayProps) {
     window.addEventListener('resize', calculatePath);
     window.addEventListener('load', calculatePath);
 
-    // Watch for internal height adjustments (e.g. text folds or image loads)
+    // Watch for actual dimension updates only to completely bypass scroll-trigger feedback loop
     let frameId: number;
+    let lastHeight = document.documentElement.scrollHeight;
+    let lastWidth = window.innerWidth;
+
     const observer = new ResizeObserver(() => {
-      cancelAnimationFrame(frameId);
-      frameId = requestAnimationFrame(() => {
-        calculatePath();
-      });
+      const currentHeight = document.documentElement.scrollHeight;
+      const currentWidth = window.innerWidth;
+      
+      if (currentHeight !== lastHeight || currentWidth !== lastWidth) {
+        lastHeight = currentHeight;
+        lastWidth = currentWidth;
+        cancelAnimationFrame(frameId);
+        frameId = requestAnimationFrame(() => {
+          calculatePath();
+        });
+      }
     });
     observer.observe(document.body);
 
@@ -157,6 +167,35 @@ export default function FuseOverlay(props: FuseOverlayProps) {
       window.removeEventListener('load', calculatePath);
       cancelAnimationFrame(frameId);
       observer.disconnect();
+    };
+  }, []);
+
+  // Native high-reliability window scroll listener fallback for absolute physical bottom detection
+  useEffect(() => {
+    const handleScroll = () => {
+      if (explodedRef.current) return;
+      const currentScroll = window.scrollY || window.pageYOffset;
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      
+      // Fully responsive boundary: 45px off the physical end of scroll represents a complete scroll down
+      const isAtBottom = maxScroll - currentScroll <= 45;
+
+      if (isAtBottom && readyToExplodeRef.current) {
+        readyToExplodeRef.current = false;
+        if (typeof setExplodedRef.current === 'function') {
+          setExplodedRef.current(true);
+        }
+      } else if (!isAtBottom && !readyToExplodeRef.current) {
+        // Once scrolled back up past 100px from the bottom, safe to re-arm
+        if (maxScroll - currentScroll > 100) {
+          readyToExplodeRef.current = true;
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -202,10 +241,10 @@ export default function FuseOverlay(props: FuseOverlayProps) {
 
           const currentScroll = window.scrollY || window.pageYOffset;
           const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-          const isAtBottom = maxScroll - currentScroll <= 35; // Within 35px of physical bottom of page
+          const isAtBottom = maxScroll - currentScroll <= 45; // Within 45px of physical bottom of page
 
-          // Trigger explosion precisely when the spark reaches the TNT at the bottom of the page
-          if ((progress >= 0.99 || isAtBottom) && readyToExplodeRef.current) {
+          // Trigger explosion precisely when the spark reaches the TNT at the bottom of the page (with a safe 0.98 threshold)
+          if ((progress >= 0.98 || isAtBottom) && readyToExplodeRef.current) {
             readyToExplodeRef.current = false;
             if (typeof setExplodedRef.current === 'function') {
               setExplodedRef.current(true);
