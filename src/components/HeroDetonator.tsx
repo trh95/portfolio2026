@@ -107,45 +107,52 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
       } else {
         // Normal scroll-animated behavior
         // Vulture swoop-in and wing-flap landing sequence
+        const startX = Math.min(window.innerWidth * 0.5, 420);
+        const startY = -Math.min(window.innerHeight * 0.6, 360);
+
         const vultureTl = gsap.timeline({
           scrollTrigger: {
             trigger: containerRef.current,
             start: 'top top',
-            end: '50% top',
-            scrub: 0.8,
+            end: 'top+=400 top',
+            scrub: 0.6, // Butter-smooth scrolling interpolation
           }
         });
 
-        // Fly-in trajectory from the sky down to landing coordinate
+        // Fly-in trajectory from the sky down to landing coordinate with realistic ease deceleration
         vultureTl.fromTo(vultureRef.current, {
-          x: 450,
-          y: -420,
-          scale: 2.2,
-          rotation: -45,
+          x: startX,
+          y: startY,
+          scale: 1.8,
+          rotation: -30,
         }, {
           x: 0,
           y: 0,
           scale: 1,
           rotation: 0,
           duration: 1.0,
-          ease: 'none',
+          ease: 'power1.out', // Physical slowing down as it reaches destination
         }, 0);
 
-        // Left wing flapping keyframes (around its (0,0) local joint base)
-        vultureTl.fromTo(leftWingRef.current, { rotation: -40 }, { rotation: 25, duration: 0.2 }, 0)
-                 .to(leftWingRef.current, { rotation: -30, duration: 0.2 })
-                 .to(leftWingRef.current, { rotation: 25, duration: 0.2 })
-                 .to(leftWingRef.current, { rotation: -15, duration: 0.2 })
-                 .to(leftWingRef.current, { rotation: 0, duration: 0.2 });
+        // Highly realistic, decaying-frequency wings flap sequence
+        vultureTl.fromTo(leftWingRef.current, { rotation: -35 }, { rotation: 20, duration: 0.15, ease: 'sine.inOut' }, 0)
+                 .to(leftWingRef.current, { rotation: -25, duration: 0.15, ease: 'sine.inOut' }, 0.15)
+                 .to(leftWingRef.current, { rotation: 20, duration: 0.15, ease: 'sine.inOut' }, 0.3)
+                 .to(leftWingRef.current, { rotation: -15, duration: 0.15, ease: 'sine.inOut' }, 0.45)
+                 .to(leftWingRef.current, { rotation: 10, duration: 0.15, ease: 'sine.inOut' }, 0.6)
+                 .to(leftWingRef.current, { rotation: -5, duration: 0.15, ease: 'sine.inOut' }, 0.75)
+                 .to(leftWingRef.current, { rotation: 0, duration: 0.25, ease: 'power1.out' }, 0.9);
 
-        // Right wing flapping keyframes (around its (0,0) local joint base)
-        vultureTl.fromTo(rightWingRef.current, { rotation: 40 }, { rotation: -25, duration: 0.2 }, 0)
-                 .to(rightWingRef.current, { rotation: 30, duration: 0.2 })
-                 .to(rightWingRef.current, { rotation: -25, duration: 0.2 })
-                 .to(rightWingRef.current, { rotation: 15, duration: 0.2 })
-                 .to(rightWingRef.current, { rotation: 0, duration: 0.2 });
+        vultureTl.fromTo(rightWingRef.current, { rotation: 35 }, { rotation: -20, duration: 0.15, ease: 'sine.inOut' }, 0)
+                 .to(rightWingRef.current, { rotation: 25, duration: 0.15, ease: 'sine.inOut' }, 0.15)
+                 .to(rightWingRef.current, { rotation: -20, duration: 0.15, ease: 'sine.inOut' }, 0.3)
+                 .to(rightWingRef.current, { rotation: 15, duration: 0.15, ease: 'sine.inOut' }, 0.45)
+                 .to(rightWingRef.current, { rotation: -10, duration: 0.15, ease: 'sine.inOut' }, 0.6)
+                 .to(rightWingRef.current, { rotation: 5, duration: 0.15, ease: 'sine.inOut' }, 0.75)
+                 .to(rightWingRef.current, { rotation: 0, duration: 0.25, ease: 'power1.out' }, 0.9);
 
         // Animate the plunger down as the user scrolls, driven by the vulture's landing weight
+        // Using stable pixel coordinates to avoid any dynamic address-bar layout shifting
         gsap.fromTo(handleRef.current, {
           y: 0
         }, {
@@ -153,9 +160,9 @@ export default function HeroDetonator({ exploded }: HeroDetonatorProps) {
           ease: 'power1.out',
           scrollTrigger: {
             trigger: containerRef.current,
-            start: '45% top', // kicks in as the vulture lands and stays pinned
-            end: '75% top',
-            scrub: 0.8,
+            start: 'top+=380 top', // starts precisely as the vulture settles on the plunger
+            end: 'top+=580 top',   // pushed down over 200px of scrolling
+            scrub: 0.6,
           }
         });
       }
