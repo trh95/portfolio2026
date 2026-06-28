@@ -188,7 +188,7 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
           const startOffset = heroEl ? heroEl.offsetHeight * 0.3 : window.innerHeight * 0.3;
           return `top+=${startOffset} top`;
         },
-        end: 'bottom bottom',
+        end: 'bottom-=85 bottom', // Ends 85px before physical bottom to guarantee reaching 100% progress on mobile/Safari
         onUpdate: (self) => {
           if (explodedRef.current) {
             // Once exploded, do not track scroll modifications back or forth!
@@ -196,10 +196,10 @@ export default function FuseOverlay({ setExploded, exploded }: FuseOverlayProps)
           }
           const progress = self.progress;
 
-          // Trigger explosion when we hit the bottom
+          // Trigger explosion when we hit the bottom area
           const currentScroll = window.scrollY || window.pageYOffset;
           const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
-          const isAtBottom = maxScroll - currentScroll <= 40; // Extremely safe threshold on mobile Safari
+          const isAtBottom = maxScroll - currentScroll <= 90; // Extremely safe threshold on mobile Safari
 
           if ((progress >= 0.98 || isAtBottom) && readyToExplodeRef.current) {
             readyToExplodeRef.current = false;
